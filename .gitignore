@@ -1,0 +1,17 @@
+.env
+.DS_Store
+scTopics
+
+.nova/
+.cache/
+abi/
+artifacts/
+build/
+cache/
+coverageEnv/
+temp/
+migrations/
+migrations_/
+typechain/
+node_modules/
+output/
