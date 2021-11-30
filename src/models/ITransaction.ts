@@ -1,4 +1,5 @@
 import { String } from "lodash";
+import { StringLiteralLike } from "typescript";
 
 export interface ITransactionResult {
   account: string // token address
@@ -15,9 +16,14 @@ export interface ITransaction {
   Type: "OfferCancel" | "OfferCreate" | "Payment"
   DateTime: string
   FromWallet: string
-  ToWallet: string
-  OrderType?: "Buy" | "Sell"
-  AmountXPUNK?: string
-  AmountXRP?: string
+  ToWallet?: string
+  InOut?: string
+  Currency?: string
+  Issuer?: string
+  Value?: number
+  CounterCurrency?: string
+  CounterIssuer?: string
+  CounterValue?: number
   Flags?: string
+  TxnSignature: string
 }

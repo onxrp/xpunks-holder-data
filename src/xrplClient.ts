@@ -1,8 +1,6 @@
 import { Client } from "xrpl"
 
-const PUBLIC_SERVER = "wss://xrplcluster.com"
-const TEST_SERVER = "wss://s.altnet.rippletest.net:51233"
-const client = new Client(PUBLIC_SERVER)
+const client = new Client(process.env.RIPPLE_SERVER ?? "wss://s1.ripple.com")
 
 export const getXRPLClient = async () => {
   if (client.isConnected()) return client

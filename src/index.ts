@@ -23,19 +23,25 @@ const toCSV = async (data: any[], fileName: string) => {
 }
 
 const main = async () => {
-  const address = !isEmpty(process.env.XPUNK_ADDRESS) ? process.env.XPUNK_ADDRESS : "rHEL3bM4RFsvF8kbQj3cya8YiDvjoEmxLq"
+  const createBalanceCSV = process.env.CREATE_BALANCE_CSV && process.env.CREATE_BALANCE_CSV.toString().toLowerCase() !== "false"
+  const xpunkAddress = !isEmpty(process.env.XPUNK_ADDRESS) ? process.env.XPUNK_ADDRESS : "rHEL3bM4RFsvF8kbQj3cya8YiDvjoEmxLq"
+
+  const walletAddress = !isEmpty(process.env.TRANSACTIONS_ADDRESS) ? process.env.TRANSACTIONS_ADDRESS : "rHEL3bM4RFsvF8kbQj3cya8YiDvjoEmxLq"
+  const createTransactionsCSV = process.env.CREATE_TRANSACTIONS_CSV && process.env.CREATE_TRANSACTIONS_CSV.toString().toLowerCase() !== "false"
   const minimumBalance = isString(process.env.MINIMUM_BALANCE) ? parseFloat(process.env.MINIMUM_BALANCE) : process.env.MINIMUM_BALANCE
   const dateFrom = !isEmpty(process.env.DATE_FROM) ? moment(process.env.DATE_FROM) : undefined
   const dateTo = !isEmpty(process.env.DATE_TO) ? moment(process.env.DATE_TO) : undefined
 
-  console.log(minimumBalance)
-
   try {
-    const balances = await getBalances(address, minimumBalance)
-    await toCSV(balances, "balances")
+    if (createBalanceCSV) {
+      const balances = await getBalances(xpunkAddress, minimumBalance)
+      await toCSV(balances, "balances")
+    }
 
-    const transactions = await getTransactions(address, dateFrom, dateTo)
-    await toCSV(transactions, "transactions")
+    if (createTransactionsCSV) {
+      const transactions = await getTransactions(walletAddress, dateFrom, dateTo)
+      await toCSV(transactions, "transactions")
+    }
   } catch(err) {
     console.error(err)
   } finally {

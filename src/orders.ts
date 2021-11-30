@@ -1,9 +1,7 @@
-import { isEmpty, isObject, isUndefined } from "lodash";
+import { isObject } from "lodash";
 import moment from "moment";
-import fetch from "node-fetch";
 import {
   rippleTimeToISOTime,
-  Transaction,
   OfferCancel,
   OfferCreate,
   Payment,
@@ -15,7 +13,7 @@ import { ITransactionResult, ITransaction } from "./models/ITransaction";
 
 export const getXRPLTransactions = async (
   tokenAddress: string,
-  dateFrom = moment().subtract(2, "days"),
+  dateFrom = moment().subtract(7, "days"),
   dateTo?: moment.Moment,
   marker: unknown = undefined
 ): Promise<ITransaction[]> => {
@@ -26,7 +24,7 @@ export const getXRPLTransactions = async (
     ledger_index_min: -1,
     ledger_index_max: -1,
     binary: false,
-    limit: 2000,
+    limit: 400,
     // "forward": false,
     marker,
   });
@@ -37,6 +35,7 @@ export const getXRPLTransactions = async (
   const transactions = [] as ITransaction[];
   (response.result.transactions ?? []).forEach((accTransaction) => {
     const transaction = accTransaction.tx;
+    const transDate = moment(rippleTimeToISOTime((<any>transaction).date));
     if (
       isObject(accTransaction.meta) &&
       accTransaction.meta.TransactionResult === "tesSUCCESS" &&
@@ -44,24 +43,26 @@ export const getXRPLTransactions = async (
         transaction.TransactionType === "Payment" ||
         transaction.TransactionType === "OfferCancel")
     ) {
-      const transDate = moment(rippleTimeToISOTime((<any>transaction).date));
       if (
         (!dateFrom || dateFrom <= transDate) &&
         (!dateTo || dateTo >= transDate)
       ) {
+        const toWallet = transaction.TransactionType === "Payment" ? transaction.Destination : undefined
         transactions.push({
           Sequence: transaction.Sequence,
           CancelledSequence: transaction.TransactionType === "OfferCreate" || transaction.TransactionType === "OfferCancel" ? transaction.OfferSequence : undefined,
           Type: transaction.TransactionType as "OfferCancel" | "OfferCreate" | "Payment",
           DateTime: transDate.toISOString(),
           FromWallet: transaction.Account,
-          ToWallet: transaction.TransactionType === "Payment" ? transaction.Destination : null,
-          ...getBuySell(transaction),
-          Flags: getFlags(transaction)
+          ToWallet: toWallet,
+          InOut: toWallet ? (toWallet?.toLowerCase() === tokenAddress?.toLowerCase() ? "IN" : "OUT") : undefined,
+          ...getAmounts(transaction),
+          Flags: getFlags(transaction),
+          TxnSignature: transaction.TxnSignature,
         });
       }
-      if (dateFrom && dateFrom > transDate) overTime = true;
     }
+    if (dateFrom && dateFrom > transDate) overTime = true;
   });
 
   if (overTime || !response?.result?.marker) return transactions;
@@ -77,13 +78,37 @@ export const getXRPLTransactions = async (
     ];
 };
 
-const getBuySell = (transaction: OfferCancel | OfferCreate | Payment) => {
-  if (transaction.TransactionType !== "OfferCreate") return {}
-  return ({
-    OrderType: isObject(transaction.TakerGets) ? "Sell" : "Buy" as "Buy" | "Sell",
-    AmountXPUNK: isObject(transaction.TakerGets) ? transaction.TakerGets.value : (isObject(transaction.TakerPays) ? transaction.TakerPays.value : "0"),
-    AmountXRP: dropsToXrp(!isObject(transaction.TakerGets) ? transaction.TakerGets : (!isObject(transaction.TakerPays) ? transaction.TakerPays : "0"))
-  })
+const getAmounts = (transaction: OfferCancel | OfferCreate | Payment) => {
+  const returnObject = {
+    Currency: undefined,
+    Issuer: undefined,
+    value: undefined,
+    CounterCurrency: undefined,
+    CounterIssuer: undefined,
+    Countervalue: undefined,
+  }
+  if (transaction.TransactionType === "Payment") {
+    return { ...returnObject, ...{
+      Currency: isObject(transaction.Amount) ? formatCurrency(transaction.Amount.currency) : "XRP",
+      Issuer: isObject(transaction.Amount) ? transaction.Amount.issuer : undefined,
+      value: (isObject(transaction.Amount) ? transaction.Amount.value : dropsToXrp(transaction.Amount)).replace(".", ","),
+    }}
+  } else if (transaction.TransactionType === "OfferCreate") {
+    return { ...returnObject, ...{
+      Currency: isObject(transaction.TakerGets) ? formatCurrency(transaction.TakerGets.currency) : "XRP",
+      Issuer: isObject(transaction.TakerGets) ? transaction.TakerGets.issuer : undefined,
+      value: (isObject(transaction.TakerGets) ? transaction.TakerGets.value : dropsToXrp(transaction.TakerGets)).replace(".", ","),
+      CounterCurrency: isObject(transaction.TakerPays) ? formatCurrency(transaction.TakerPays.currency) : "XRP",
+      CounterIssuer: isObject(transaction.TakerPays) ? transaction.TakerPays.issuer : undefined,
+      Countervalue: (isObject(transaction.TakerPays) ? transaction.TakerPays.value : dropsToXrp(transaction.TakerPays)).replace(".", ","),
+    }}
+  }
+  return returnObject
+}
+const formatCurrency = (currency: string) => {
+  const isHex = /[0-9A-Fa-f]{6}/g.test(currency)
+  if (isHex) return Buffer.from(currency, "hex").toString("utf8");
+  return currency
 }
 
 const getFlags = (transaction: OfferCancel | OfferCreate | Payment) => {
