@@ -14,9 +14,14 @@ export const getBalances = async (tokenAddress: string, minimumBalance = 0) => {
   if (trustlines != null) {
     const balances: IBalance[] = trustlines.map((trustline) => ({
       address: trustline?.specification?.counterparty,
-      amount: parseFloat((trustline?.state?.balance ?? "").replace("-", ""))
-    })).filter(balance => minimumBalance === 0 ? balance.amount > minimumBalance : balance.amount >= minimumBalance)
+      amount: (trustline?.state?.balance ?? "").replace("-", "").replace(".", ",")
+    })).filter(b => filterBalance(b, minimumBalance))
     return balances
   }
   return []
+}
+
+const filterBalance = (balance: IBalance, minimumBalance: number) => {
+  const amount = parseFloat(balance.amount.replace(",", "."))
+  return minimumBalance === 0 ? amount > minimumBalance : amount >= minimumBalance
 }

@@ -1,5 +1,5 @@
 
 export interface IBalance {
   address: string
-  amount: number
+  amount: string
 }
