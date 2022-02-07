@@ -15,6 +15,8 @@ export interface ITransaction {
   CancelledSequence?: number
   Type: "OfferCancel" | "OfferCreate" | "Payment"
   DateTime: string
+  Date: string
+  Time: string
   FromWallet: string
   ToWallet?: string
   InOut?: string

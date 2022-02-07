@@ -35,7 +35,7 @@ export const getXRPLTransactions = async (
   const transactions = [] as ITransaction[];
   (response.result.transactions ?? []).forEach((accTransaction) => {
     const transaction = accTransaction.tx;
-    const transDate = moment(rippleTimeToISOTime((<any>transaction).date));
+    const transDate = moment(rippleTimeToISOTime((<any>transaction).date)).utc();
     if (
       isObject(accTransaction.meta) &&
       accTransaction.meta.TransactionResult === "tesSUCCESS" &&
@@ -53,6 +53,8 @@ export const getXRPLTransactions = async (
           CancelledSequence: transaction.TransactionType === "OfferCreate" || transaction.TransactionType === "OfferCancel" ? transaction.OfferSequence : undefined,
           Type: transaction.TransactionType as "OfferCancel" | "OfferCreate" | "Payment",
           DateTime: transDate.toISOString(),
+          Date: transDate.format(moment.HTML5_FMT.DATE),
+          Time: transDate.format(moment.HTML5_FMT.TIME_SECONDS),
           FromWallet: transaction.Account,
           ToWallet: toWallet,
           InOut: toWallet ? (toWallet?.toLowerCase() === tokenAddress?.toLowerCase() ? "IN" : "OUT") : undefined,
