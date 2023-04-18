@@ -11,6 +11,7 @@ export interface ITransactionResult {
 }
 
 export interface ITransaction {
+  LedgerIndex: number,
   Sequence: number
   CancelledSequence?: number
   Type: "OfferCancel" | "OfferCreate" | "Payment"

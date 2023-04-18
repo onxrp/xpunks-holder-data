@@ -13,7 +13,9 @@ import { ITransactionResult, ITransaction } from "./models/ITransaction";
 
 export const getXRPLTransactions = async (
   tokenAddress: string,
-  dateFrom = moment().subtract(7, "days"),
+  blockFrom?: number,
+  blockTo?: number,
+  dateFrom?: moment.Moment,
   dateTo?: moment.Moment,
   marker: unknown = undefined
 ): Promise<ITransaction[]> => {
@@ -21,34 +23,35 @@ export const getXRPLTransactions = async (
   const response = await client.request({
     command: "account_tx",
     account: tokenAddress,
-    ledger_index_min: -1,
-    ledger_index_max: -1,
+    ledger_index_min: blockFrom,
+    ledger_index_max: blockTo,
     binary: false,
     limit: 400,
-    // "forward": false,
+    forward: true,
     marker,
   });
 
   if (!response?.result?.transactions) return [];
 
-  let overTime = false;
+  let finished = false;
   const transactions = [] as ITransaction[];
   (response.result.transactions ?? []).forEach((accTransaction) => {
     const transaction = accTransaction.tx;
     const transDate = moment(rippleTimeToISOTime((<any>transaction).date)).utc();
     if (
-      isObject(accTransaction.meta) &&
-      accTransaction.meta.TransactionResult === "tesSUCCESS" &&
-      (transaction.TransactionType === "OfferCreate" ||
-        transaction.TransactionType === "Payment" ||
-        transaction.TransactionType === "OfferCancel")
+      (!dateFrom || dateFrom <= transDate) &&
+      (!dateTo || dateTo >= transDate)
     ) {
       if (
-        (!dateFrom || dateFrom <= transDate) &&
-        (!dateTo || dateTo >= transDate)
+        isObject(accTransaction.meta) &&
+        accTransaction.meta.TransactionResult === "tesSUCCESS" &&
+        (transaction.TransactionType === "OfferCreate" ||
+          transaction.TransactionType === "Payment" ||
+          transaction.TransactionType === "OfferCancel")
       ) {
         const toWallet = transaction.TransactionType === "Payment" ? transaction.Destination : undefined
         transactions.push({
+          LedgerIndex: accTransaction.ledger_index,
           Sequence: transaction.Sequence,
           CancelledSequence: transaction.TransactionType === "OfferCreate" || transaction.TransactionType === "OfferCancel" ? transaction.OfferSequence : undefined,
           Type: transaction.TransactionType as "OfferCancel" | "OfferCreate" | "Payment",
@@ -63,16 +66,19 @@ export const getXRPLTransactions = async (
           TxnSignature: transaction.TxnSignature,
         });
       }
+    } else {
+      finished = true
     }
-    if (dateFrom && dateFrom > transDate) overTime = true;
   });
 
-  if (overTime || !response?.result?.marker) return transactions;
+  if (finished || !response?.result?.marker) return transactions;
   else
     return [
       ...transactions,
       ...(await getXRPLTransactions(
         tokenAddress,
+        blockFrom,
+        blockTo,
         dateFrom,
         dateTo,
         response?.result?.marker
@@ -138,11 +144,15 @@ const getFlags = (transaction: OfferCancel | OfferCreate | Payment) => {
 
 export const getTransactions = async (
   tokenAddress: string,
+  blockFrom?: number,
+  blockTo?: number,
   dateFrom?: moment.Moment,
   dateTo?: moment.Moment
 ) => {
   const transactions = await getXRPLTransactions(
     tokenAddress,
+    blockFrom,
+    blockTo,
     dateFrom,
     dateTo
   );

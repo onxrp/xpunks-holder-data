@@ -2,7 +2,7 @@ import fetch from "node-fetch"
 import { disconnectClient } from "./xrplClient";
 import { getTransactions } from "./orders";
 import { getBalances } from "./trustlines";
-import ObjectsToCsv from "objects-to-csv"
+import ObjectsToCsv from 'objects-to-csv-file'
 import moment from "moment";
 import fs from "fs"
 import dotenv from "dotenv"
@@ -16,7 +16,7 @@ const toCSV = async (data: any[], fileName: string) => {
   // Save to file:
   !fs.existsSync(`./output/`) && fs.mkdirSync(`./output/`, { recursive: true })
   const finalFileName = `./output/${fileName}-${moment().unix()}.csv`
-  fs.writeFileSync(finalFileName, '"sep=,"\n' + await csv.toString())
+  await csv.toDisk(finalFileName);
  
   // Return the CSV file as string:
   console.log("Contents in: " + finalFileName);
@@ -29,6 +29,8 @@ const main = async () => {
   const walletAddress = !isEmpty(process.env.TRANSACTIONS_ADDRESS) ? process.env.TRANSACTIONS_ADDRESS : "rHEL3bM4RFsvF8kbQj3cya8YiDvjoEmxLq"
   const createTransactionsCSV = process.env.CREATE_TRANSACTIONS_CSV && process.env.CREATE_TRANSACTIONS_CSV.toString().toLowerCase() !== "false"
   const minimumBalance = isString(process.env.MINIMUM_BALANCE) ? parseFloat(process.env.MINIMUM_BALANCE) : process.env.MINIMUM_BALANCE
+  const blockFrom = !isEmpty(process.env.BLOCK_NUMBER_FROM) ? parseInt(process.env.BLOCK_NUMBER_FROM.toString()) : undefined
+  const blockTo = !isEmpty(process.env.BLOCK_NUMBER_TO) ? parseInt(process.env.BLOCK_NUMBER_TO.toString()) : undefined
   const dateFrom = !isEmpty(process.env.DATE_FROM) ? moment(process.env.DATE_FROM) : undefined
   const dateTo = !isEmpty(process.env.DATE_TO) ? moment(process.env.DATE_TO) : undefined
 
@@ -39,7 +41,7 @@ const main = async () => {
     }
 
     if (createTransactionsCSV) {
-      const transactions = await getTransactions(walletAddress, dateFrom, dateTo)
+      const transactions = await getTransactions(walletAddress, blockFrom, blockTo, dateFrom, dateTo)
       await toCSV(transactions, "transactions")
     }
   } catch(err) {
