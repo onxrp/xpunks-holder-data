@@ -28,7 +28,8 @@ export const getXRPLTransactions = async (
     binary: false,
     limit: 400,
     forward: true,
-    ledger_index: 'current',
+    ledger_index: 'validated',
+    api_version: 1,
     marker,
   });
 
@@ -38,6 +39,7 @@ export const getXRPLTransactions = async (
   const transactions = [] as ITransaction[];
   (response.result.transactions ?? []).forEach((accTransaction) => {
     const transaction = accTransaction.tx;
+    // console.log(accTransaction, transaction)
     const transDate = moment(rippleTimeToISOTime((<any>transaction).date)).utc();
     if (
       (!dateFrom || dateFrom <= transDate) &&
