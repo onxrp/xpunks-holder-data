@@ -28,6 +28,7 @@ export const getXRPLTransactions = async (
     binary: false,
     limit: 400,
     forward: true,
+    ledger_index: 'current',
     marker,
   });
 
