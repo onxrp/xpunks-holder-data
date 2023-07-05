@@ -7,6 +7,7 @@ import {
   Payment,
   dropsToXrp,
   OfferCreateFlags,
+  AccountTxRequest,
 } from "xrpl";
 import { getXRPLClient } from "./xrplClient";
 import { ITransactionResult, ITransaction } from "./models/ITransaction";
@@ -20,18 +21,19 @@ export const getXRPLTransactions = async (
   marker: unknown = undefined
 ): Promise<ITransaction[]> => {
   const client = await getXRPLClient();
-  const response = await client.request({
+  const request: AccountTxRequest = {
     command: "account_tx",
     account: tokenAddress,
-    ledger_index_min: blockFrom,
-    ledger_index_max: blockTo,
     binary: false,
     limit: 400,
     forward: true,
-    ledger_index: 'validated',
+    ledger_index: 'current',
     api_version: 1,
     marker,
-  });
+  }
+  if (blockFrom) request.ledger_index_min = blockFrom
+  if (blockTo) request.ledger_index_max = blockTo
+  const response = await client.request(request);
 
   if (!response?.result?.transactions) return [];
 
@@ -39,11 +41,10 @@ export const getXRPLTransactions = async (
   const transactions = [] as ITransaction[];
   (response.result.transactions ?? []).forEach((accTransaction) => {
     const transaction = accTransaction.tx;
-    // console.log(accTransaction, transaction)
-    const transDate = moment(rippleTimeToISOTime((<any>transaction).date)).utc();
+    const transDate = transaction.date ? moment(rippleTimeToISOTime(transaction.date)).utc() : undefined;
     if (
-      (!dateFrom || dateFrom <= transDate) &&
-      (!dateTo || dateTo >= transDate)
+      (!dateFrom || !transDate || dateFrom <= transDate) &&
+      (!dateTo || !transDate || dateTo >= transDate)
     ) {
       if (
         isObject(accTransaction.meta) &&
@@ -58,9 +59,9 @@ export const getXRPLTransactions = async (
           Sequence: transaction.Sequence,
           CancelledSequence: transaction.TransactionType === "OfferCreate" || transaction.TransactionType === "OfferCancel" ? transaction.OfferSequence : undefined,
           Type: transaction.TransactionType as "OfferCancel" | "OfferCreate" | "Payment",
-          DateTime: transDate.toISOString(),
-          Date: transDate.format(moment.HTML5_FMT.DATE),
-          Time: transDate.format(moment.HTML5_FMT.TIME_SECONDS),
+          DateTime: transDate?.toISOString(),
+          Date: transDate?.format(moment.HTML5_FMT.DATE),
+          Time: transDate?.format(moment.HTML5_FMT.TIME_SECONDS),
           FromWallet: transaction.Account,
           ToWallet: toWallet,
           InOut: toWallet ? (toWallet?.toLowerCase() === tokenAddress?.toLowerCase() ? "IN" : "OUT") : undefined,
